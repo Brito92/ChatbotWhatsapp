@@ -1,0 +1,141 @@
+const qrcode = require('qrcode-terminal');
+const { Client, Buttons, List, MessageMedia } = require('whatsapp-web.js');
+const client = new Client();
+
+const userStatus = new Map(); // Guarda o estado de cada usuário (ex: aluno ou não)
+
+// Serviço de leitura do QR code
+client.on('qr', qr => {
+    qrcode.generate(qr, { small: true });
+});
+
+// Após isso ele diz que foi tudo certo
+client.on('ready', () => {
+    console.log('Tudo certo! WhatsApp conectado.');
+});
+
+client.on('disconnected', (reason) => {
+    console.log('❌ Cliente desconectado. Motivo:', reason);
+});
+
+client.initialize();
+
+const delay = ms => new Promise(res => setTimeout(res, ms));
+
+const timeoutHandler = (chat, timeoutDuration) => {
+    setTimeout(async () => {
+        await chat.sendMessage('O atendimento será encerrado por inatividade. Caso precise de mais assistência, por favor entre em contato novamente.');
+    }, timeoutDuration);
+}
+
+const endAttending = async (msg, chat) => {
+    userStatus.delete(msg.from); // Limpa o status do usuário ao encerrar
+    await chat.sendMessage('O atendimento foi encerrado. Caso precise de mais ajuda, entre em contato novamente. Até logo! 👋');
+}
+
+const startAttending = async (msg, contactName, isAluno) => {
+    const chat = await msg.getChat();
+    userStatus.set(msg.from, { isAluno }); // Salva o status
+
+    await delay(3000);
+    await chat.sendStateTyping();
+    await delay(3000);
+
+    if (isAluno) {
+        await client.sendMessage(msg.from,
+            `Olá, ${contactName.split(" ")[0]}! 👋\n\nSou o assistente virtual da Fametro Leste.\n\nPrezado(a) aluno(a), digite o número correspondente ao atendimento que deseja:\n\n1 - Participar da Comunidade Empremetro (Estágio/Emprego)\n2 - Cadastro Trabalhe Conosco\n3 - Carteirinha Estudantil\n4 - Assinatura do TCE\n5 - Cancelamento/Trancamento de matrícula\n6 - Ouvidoria\n7 - Outras dúvidas\n\nDigite 'encerrar' a qualquer momento para finalizar o atendimento.`
+        );
+    } else {
+        await client.sendMessage(msg.from,
+            `Olá, ${contactName.split(" ")[0]}! 👋\n\nSou o assistente virtual da Fametro Leste.\n\nComo não-aluno, digite o número correspondente ao atendimento que deseja:\n\n1 - Cadastro de Interesse para Comunidade Empremetro\n2 - Cadastro Trabalhe Conosco\n3 - Ouvidoria\n4 - Outras dúvidas\n\nDigite 'encerrar' a qualquer momento para finalizar o atendimento.`
+        );
+    }
+
+    timeoutHandler(chat, 30 * 60 * 1000);
+}
+
+const openQuestionHandler = async (msg, contactName) => {
+    const chat = await msg.getChat();
+    await delay(3000);
+    await chat.sendStateTyping();
+    await delay(3000);
+
+    await client.sendMessage(msg.from,
+        `Olá, ${contactName.split(" ")[0]}! 👋\n\nPor favor, digite sua dúvida abaixo. Assim que um de nossos atendentes estiver disponível, irá te atender.\n\nDigite 'encerrar' a qualquer momento para finalizar o atendimento.`
+    );
+
+    timeoutHandler(chat, 60 * 60 * 1000);
+}
+
+client.on('message', async msg => {
+    const chat = await msg.getChat();
+
+    if (msg.body.toLowerCase() === 'encerrar' && msg.from.endsWith('@c.us')) {
+        await endAttending(msg, chat);
+        return;
+    }
+
+    if (msg.body.match(/(menu|Menu|oi|Oi|Olá|olá|ola|Ola)/i) && msg.from.endsWith('@c.us')) {
+        const contact = await msg.getContact();
+        const name = contact.pushname;
+
+        await client.sendMessage(msg.from, 'Você é aluno da Fametro Leste? Responda com "sim" ou "não".');
+
+        client.once('message', async (responseMsg) => {
+            if (responseMsg.from === msg.from) {
+                const answer = responseMsg.body.toLowerCase();
+                if (answer === 'sim') {
+                    await startAttending(responseMsg, name, true);
+                } else if (answer === 'não' || answer === 'nao') {
+                    await startAttending(responseMsg, name, false);
+                } else {
+                    await client.sendMessage(msg.from, 'Por favor, responda apenas com "sim" ou "não".');
+                }
+            }
+        });
+    }
+
+    // Recupera o status atual do usuário
+    const status = userStatus.get(msg.from);
+
+    // Se ainda não respondeu se é aluno ou não, ignora as opções
+    if (!status) return;
+
+    // Opções para ALUNO
+    if (status.isAluno) {
+        if (msg.body === '1') {
+            await client.sendMessage(msg.from, 'Atendimento: Comunidade Empremetro\n\nNos informe sua matrícula e contato atualizado para que possamos lhe incluir na comunidade!');
+            client.once('message', async (newMsg) => {
+                if (newMsg.from === msg.from) {
+                    await chat.sendStateTyping();
+                    await client.sendMessage(msg.from, 'Obrigado! Em breve você será incluso em nossa comunidade.');
+                }
+            });
+            timeoutHandler(chat, 30 * 60 * 1000);
+        } else if (msg.body === '7') {
+            const contact = await msg.getContact();
+            const name = contact.pushname;
+            await openQuestionHandler(msg, name);
+        }
+        // Adicione as opções 2-6 aqui para aluno
+    }
+
+    // Opções para NÃO-ALUNO
+    if (!status.isAluno) {
+        if (msg.body === '1') {
+            await client.sendMessage(msg.from, 'Cadastro de Interesse: Comunidade Empremetro\n\nPor favor, informe seu nome completo e contato atualizado.');
+            client.once('message', async (newMsg) => {
+                if (newMsg.from === msg.from) {
+                    await chat.sendStateTyping();
+                    await client.sendMessage(msg.from, 'Obrigado! Em breve entraremos em contato.');
+                }
+            });
+            timeoutHandler(chat, 30 * 60 * 1000);
+        } else if (msg.body === '4') {
+            const contact = await msg.getContact();
+            const name = contact.pushname;
+            await openQuestionHandler(msg, name);
+        }
+        // Adicione as opções 2-3 aqui para não-aluno
+    }
+});

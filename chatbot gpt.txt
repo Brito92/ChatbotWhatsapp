@@ -1,0 +1,145 @@
+const qrcode = require('qrcode-terminal');
+const { Client, Buttons, List, MessageMedia } = require('whatsapp-web.js');
+const client = new Client();
+const delay = ms => new Promise(res => setTimeout(res, ms));
+
+let userStates = {}; // Estados dos usuários
+
+client.on('qr', qr => {
+    qrcode.generate(qr, { small: true });
+});
+
+client.on('ready', () => {
+    console.log('Tudo certo! WhatsApp conectado.');
+});
+
+client.initialize();
+
+// Função para enviar o menu inicial
+async function sendMenu(client, chatId, name) {
+    await client.sendMessage(chatId,
+        `Olá, ${name.split(" ")[0]}! 👋\n\nSou o assistente virtual do setor NADI da Fametro Leste.\n\nDigite o número correspondente ao atendimento que deseja:\n\n` +
+        `1 - Comunidade Empremetro (Estágio/Emprego)\n` +
+        `2 - Cadastro Trabalhe Conosco\n` +
+        `3 - Carteirinha Estudantil\n` +
+        `4 - Assinatura do TCE\n` +
+        `5 - Cancelamento/Trancamento de matrícula\n` +
+        `6 - Ouvidoria\n` +
+        `7 - Outras dúvidas`
+    );
+}
+
+// Função para oferecer retornar ao menu ou encerrar
+async function askReturnOrEnd(client, chatId) {
+    await delay(3000);
+    await client.sendMessage(chatId, "Deseja voltar ao menu? Digite *menu*.\nOu digite *encerrar* para finalizar o atendimento.");
+    
+    // Se o usuário não responder em 2 minutos, encerramos automático
+    setTimeout(async () => {
+        if (userStates[chatId] === 'waiting_return') {
+            await client.sendMessage(chatId, "Encerramos o atendimento por inatividade. Caso precise, é só nos chamar novamente. 👋");
+            delete userStates[chatId];
+        }
+    }, 2 * 60 * 1000);
+}
+
+client.on('message', async msg => {
+    const chat = await msg.getChat();
+    const contact = await msg.getContact();
+    const name = contact.pushname || "Aluno(a)";
+
+    if (userStates[msg.from] === 'waiting_return') {
+        if (msg.body.toLowerCase() === 'menu') {
+            await sendMenu(client, msg.from, name);
+            userStates[msg.from] = 'menu';
+        } else if (msg.body.toLowerCase() === 'encerrar') {
+            await client.sendMessage(msg.from, "✅ Atendimento encerrado. Obrigado pelo contato!");
+            delete userStates[msg.from];
+        }
+        return;
+    }
+
+    if (userStates[msg.from] === 'awaiting_additional_info') {
+        // Se está na opção 7 (outras dúvidas), aceita mensagens normalmente
+        return;
+    }
+
+    if (userStates[msg.from] !== 'menu') {
+        // Se ainda não mandou o menu, qualquer mensagem que chegar dispara o menu
+        await delay(2000);
+        await chat.sendStateTyping();
+        await delay(2000);
+        await sendMenu(client, msg.from, name);
+        userStates[msg.from] = 'menu';
+        return;
+    }
+
+    // Agora, tratando as respostas do menu
+    if (/^[1-7]$/.test(msg.body.trim()) && msg.from.endsWith('@c.us')) {
+        await delay(2000);
+        await chat.sendStateTyping();
+        await delay(2000);
+
+        switch (msg.body.trim()) {
+            case '1':
+                await client.sendMessage(msg.from, "Atendimento: Comunidade Empremetro\n\nPor favor, envie sua matrícula e contato atualizado para inclusão!");
+                client.once('message', async (newMsg) => {
+                    if (newMsg.from === msg.from) {
+                        await delay(2000);
+                        await chat.sendStateTyping();
+                        await delay(2000);
+                        await client.sendMessage(msg.from, "✅ Obrigado pelas informações! Em breve você será incluído.");
+                        await askReturnOrEnd(client, msg.from);
+                        userStates[msg.from] = 'waiting_return';
+                    }
+                });
+                break;
+
+            case '2':
+                await client.sendMessage(msg.from, "Atendimento: Trabalhe Conosco\n\nPreencha o formulário: https://forms.gle/LGoEYNW8StXZQbCy8");
+                await askReturnOrEnd(client, msg.from);
+                userStates[msg.from] = 'waiting_return';
+                break;
+
+            case '3':
+                await client.sendMessage(msg.from, "Atendimento: Carteirinha Estudantil\n\nFormulário: https://forms.gle/dUvc93jHSUxVyUgx6");
+                await askReturnOrEnd(client, msg.from);
+                userStates[msg.from] = 'waiting_return';
+                break;
+
+            case '4':
+                await client.sendMessage(msg.from, "Atendimento: Assinatura TCE\n\nSe já assinou, traga as vias ao NADI. Se foi enviado por e-mail, envie nome completo e CPF.");
+                client.once('message', async (newMsg) => {
+                    if (newMsg.from === msg.from) {
+                        await delay(2000);
+                        await chat.sendStateTyping();
+                        await delay(2000);
+                        await client.sendMessage(msg.from, "✅ Informação recebida! Vamos verificar.");
+                        await askReturnOrEnd(client, msg.from);
+                        userStates[msg.from] = 'waiting_return';
+                    }
+                });
+                break;
+
+            case '5':
+                await client.sendMessage(msg.from, "Atendimento: Cancelamento/Trancamento\n\nCompareça ao setor NADI. Se necessário, envie representante com procuração.");
+                await askReturnOrEnd(client, msg.from);
+                userStates[msg.from] = 'waiting_return';
+                break;
+
+            case '6':
+                await client.sendMessage(msg.from, "Atendimento: Ouvidoria\n\nLink: https://fametro.edu.br/ouvidoria/");
+                await askReturnOrEnd(client, msg.from);
+                userStates[msg.from] = 'waiting_return';
+                break;
+
+            case '7':
+                await client.sendMessage(msg.from, "Atendimento: Outras Dúvidas\n\nDescreva sua dúvida. Um de nossos atendentes responderá em breve.");
+                userStates[msg.from] = 'awaiting_additional_info';
+                break;
+        }
+    }
+    /* else {
+        await client.sendMessage(msg.from, "❗ Por favor, digite apenas um número de 1 a 7 para continuar.");
+    }*/
+});
