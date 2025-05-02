@@ -1,0 +1,28 @@
+/*if (isAluno) {
+        await client.sendMessage(msg.from,
+            `Olá, ${contactName.split(" ")[0]}! 👋\n\nSou o assistente virtual da Fametro Leste.\n\nPrezado(a) aluno(a), 
+            digite o número correspondente ao atendimento que deseja:\n
+            \n1 - Retorno de requerimentos
+            \n2 - Financeiro
+            \n3 - Declarações ou histórico escolar
+            \n4 - Justificativa de falta
+            \n5 - Pós-graduação ou técnico
+            \n6 - Trabalhe conosco (Estágio/Emprego)
+            \n7 - Cadastro/recadastro Carteirinha Estudantil
+            \n8 - Assinatura do TCE
+            \n9 - Cancelamento/Trancamento de matrícula
+            \n10 - Ouvidoria
+            \n11 - Outras dúvidas
+            \n\nDigite 'encerrar' a qualquer momento para finalizar o atendimento.`
+        );
+    } else {
+        await client.sendMessage(msg.from,
+            `Olá, ${contactName.split(" ")[0]}! 👋\n\nSou o assistente virtual da Fametro Leste.\n
+            \nPrezado(a), digite o número correspondente ao atendimento que deseja:\n
+            \n1 - Informações sobre os cursos
+            \n2 - Formas de ingresso
+            \n3 - Ouvidoria
+            \n4 - Falar com um atendente
+            \n\nDigite 'encerrar' a qualquer momento para finalizar o atendimento.`
+        );
+    }
