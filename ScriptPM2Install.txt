@@ -1,0 +1,30 @@
+ Opção 1: Manter rodando com PM2 no seu computador ou servidor
+Ideal para quem está rodando o bot em um PC pessoal, notebook ou servidor VPS (Linux).
+
+1. Instale o PM2 globalmente:
+
+	"npm install -g pm2"
+
+2. Rode o seu bot com PM2:
+
+	"pm2 start seu-bot.js --name chatbot-fametro"
+
+3. Salve o processo para que reinicie automaticamente após queda:
+
+	"pm2 save"
+	"pm2 startup"
+
+O pm2 startup vai gerar um comando que você deve copiar e colar para habilitar o autostart.
+
+4. Monitorar logs:
+
+	"pm2 logs chatbot-fametro"
+
+5. Comandos úteis:
+
+	"pm2 list – mostra bots ativos"
+
+	"pm2 stop chatbot-fametro – pausa"
+
+	"pm2 restart chatbot-fametro – reinicia"
+

@@ -1,0 +1,24 @@
+🧼 Se nada funcionar:
+Apague a pasta de sessão antiga (se existir) para forçar a regeneração do QR:
+
+rm -rf .wwebjs_auth
+
+Ou no Windows PowerShell:
+
+Remove-Item -Recurse -Force .wwebjs_auth
+
+Depois rode novamente:
+
+node chatbot.js
+
+🛑 Como parar o bot no PM2:
+
+pm2 stop chatbot
+
+Ou, se não souber o nome exato:
+
+pm2 stop all
+
+Depois disso, você poderá deletar a pasta com:
+
+Remove-Item -Recurse -Force .wwebjs_auth
