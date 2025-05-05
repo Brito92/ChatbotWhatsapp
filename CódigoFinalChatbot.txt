@@ -134,6 +134,23 @@ const FSM = {
     }
 };
 
+// Objeto de sessões dos usuários
+//const userSessions = {};
+
+const authorizedAgents = ['5592984336160@c.us']; // agente autorizado
+
+function isAgent(number) {
+    return authorizedAgents.includes(number);
+}
+
+// Quando o atendente assume
+function setAttendingUser(userId, isBeingAttended = true) {
+    userSessions[userId] = {
+        ...userSessions[userId],
+        beingAttended: isBeingAttended
+    };
+}
+
 client.on('message', async msg => {
     const chat = await msg.getChat();
     if (msg.body.toLowerCase() === 'encerrar' && msg.from.endsWith('@c.us')) {
@@ -144,6 +161,43 @@ client.on('message', async msg => {
     const user = getUserState(msg.from);
     const contact = await msg.getContact();
     const name = contact.pushname;
+
+    if (chat.isGroup) {
+        return;
+    }
+
+    const userId = msg.from;
+
+     // ⚠️ Verifica se o remetente é um atendente autorizado
+     if (msg.body === '!atender' && isAgent(userId)) {
+        if (msg.mentionedIds.length === 0) {
+            msg.reply('❗ Você precisa marcar o número do cliente para ativar o modo atendimento.');
+            return;
+        }
+
+        const targetId = msg.mentionedIds[0];
+        setAttendingUser(targetId, true);
+        msg.reply(`🛑 O bot foi pausado para ${targetId}.`);
+        return;
+    }
+
+    if (msg.body === '!finalizar' && isAgent(userId)) {
+        if (msg.mentionedIds.length === 0) {
+            msg.reply('❗ Você precisa marcar o número do cliente para finalizar o atendimento.');
+            return;
+        }
+
+        const targetId = msg.mentionedIds[0];
+        setAttendingUser(targetId, false);
+        msg.reply(`✅ O atendimento de ${targetId} foi finalizado. O bot voltou a responder.`);
+        return;
+    }
+
+    // Se o usuário está sendo atendido, o bot não responde
+    if (userSessions[userId]?.beingAttended) {
+        console.log(`Usuário ${userId} está em atendimento humano.`);
+        return;
+    }
 
     if (FSM[user.state]) {
         await FSM[user.state](msg, chat, name);
@@ -292,6 +346,6 @@ async function handleNaoAlunoMenu(msg, chat) {
         const contact = await msg.getContact();
         await openQuestionHandler(msg, contact.pushname);
     } else {
-        await client.sendMessage(msg.from, 'Opção inválida. Por favor, digite um número de 1 a 4 ou "encerrar" para finalizar.');
+        await client.sendMessage(msg.from, 'Digite "encerrar" caso queira iniciar uma nova interação.');
     }
 }
